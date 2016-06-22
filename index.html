@@ -1,35 +1,187 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
-    <meta charset="UTF-8">
-    <title>Svg-animation-test by alexpreynolds</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
-    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
-  </head>
-  <body>
-    <section class="page-header">
-      <h1 class="project-name">Svg-animation-test</h1>
-      <h2 class="project-tagline">A project to test SVG element animation</h2>
-      <a href="https://github.com/alexpreynolds/svg-animation-test" class="btn">View on GitHub</a>
-      <a href="https://github.com/alexpreynolds/svg-animation-test/zipball/master" class="btn">Download .zip</a>
-      <a href="https://github.com/alexpreynolds/svg-animation-test/tarball/master" class="btn">Download .tar.gz</a>
-    </section>
+    <head>
+        <meta charset="UTF-8">
+        <title>svg-animation-test</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    </head>
+    <body>
+        <div id="content">
+            <h1>SVG Animation Test</h1>
+            <form class='settings_form'>
+                <label>Tween</label>
+                <select id="tween_select">
+                    <option value="no_tween">None</option>
+                    <option value="linear_tween">Linear</option>
+                    <option value="quad_tween">Quadratic</option>
+                    <option value="cubic_tween" selected="true">Cubic</option>
+                    <option value="elasic_tween">Elastic</option>
+                    <option value="bounce_tween">Bounce</option>
+                </select>
+                <br />
+                <label>Frame duration</label>
+                <select id="frame_duration_select">
+                    <option value="100">100 ms</option>
+                    <option value="500" selected="true">500 ms</option>
+                    <option value="1000">1 s</option>
+                    <option value="2000">2 s</option>
+                </select>
+            </form>
+        </div>
+        <div class="svg-container"></div>
+        
+        <script src="//d3js.org/d3.v3.min.js"></script>
+        <script src="assets/js/sprintf.js"></script>
+        <script type="text/javascript">
+            window.addEventListener("load", function() {
+                var node_layer_count = 13;
+                var node_layer_current = 1;
+                var node_layer_previous = node_layer_count;
+                var node_root = "assets/nodes/";
+                var node_path = node_root + "layers.xml";
+                var svg_parent = null;
+                var node_layers = null;
+                var current_node_animation = null;
 
-    <section class="main-content">
-      <h1>
-<a id="svg-animation-test" class="anchor" href="#svg-animation-test" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>svg-animation-test</h1>
+                /* add change listeners for tween and frame duration pull-down menus */
+                const NO_TWEEN = "no_tween";
+                const LINEAR_TWEEN = "linear_tween";
+                const QUAD_TWEEN = "quad_tween";
+                const CUBIC_TWEEN = "cubic_tween";
+                const ELASTIC_TWEEN = "elasic_tween";
+                const BOUNCE_TWEEN = "bounce_tween";
+                var tween_select_obj = document.getElementById("tween_select");
+                var tween_selection = tween_select_obj.value;
+                tween_select_obj.addEventListener("change", function() {
+                    tween_selection = tween_select_obj.value;
+                    view_refresh();
+                }, false);
+                var frame_duration_select_obj = document.getElementById("frame_duration_select");
+                var frame_duration_selection = frame_duration_select_obj.value;
+                frame_duration_select_obj.addEventListener("change", function() { 
+                    frame_duration_selection = frame_duration_select_obj.value;
+                    view_refresh();
+                }, false);
 
-      <footer class="site-footer">
-        <span class="site-footer-owner"><a href="https://github.com/alexpreynolds/svg-animation-test">Svg-animation-test</a> is maintained by <a href="https://github.com/alexpreynolds">alexpreynolds</a>.</span>
+                /* load XML */
+                d3.xml(node_path, "image/svg+xml", function(error, xml) {
+                    if (error) throw error;
+                    /* add attributes to center element over window background */
+                    xml.documentElement.setAttribute("preserveAspectRatio", "xMidYMid meet");
+                    xml.documentElement.setAttribute("class", "svg-content");
+                    /* get SVG parent container and make hidden */
+                    svg_parent = document.getElementsByClassName('svg-container')[0];
+                    /* append XML to parent container */
+                    svg_parent.appendChild(xml.documentElement);
+                    view_refresh();
+                });
 
-        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
-      </footer>
+                /* call when XML is loaded or display settings are changed */
+                var view_refresh = function() {
+                    !current_node_animation || clearInterval(current_node_animation);
+                    svg_parent.style.visibility = "hidden";
+                    node_layers = d3.select('#node_layers');
+                    set_all_node_layers_opacity(0, function() {
+                        set_node_layer_opacity(1, 1);
+                        svg_parent.style.visibility = "visible";
+                        if (tween_selection == NO_TWEEN) {
+                            no_tween_animation();
+                        }
+                        else if (tween_selection == LINEAR_TWEEN) {
+                            linear_tween_animation();
+                        }
+                        else if (tween_selection == QUAD_TWEEN) {
+                            quad_tween_animation();
+                        }
+                        else if (tween_selection == CUBIC_TWEEN) {
+                            cubic_tween_animation();
+                        }
+                        else if (tween_selection == ELASTIC_TWEEN) {
+                            elastic_tween_animation();
+                        }
+                        else if (tween_selection == BOUNCE_TWEEN) {
+                            bounce_tween_animation();
+                        }
+                    });
+                };
 
-    </section>
+                /* set all "node_layer" classed elements opacity */
+                var set_all_node_layers_opacity = function(o, callback) {
+                    d3.selectAll('.node_layer').transition().duration(0).style("opacity", o).call(set_all_node_layers_opacity_finished, callback);
+                };
 
-  
-  </body>
+                /* call the callback once all the layers opacity have been set to the desired value */
+                var set_all_node_layers_opacity_finished = function(transition, callback) {
+                    var n = 0;
+                    transition.each(function() { ++n; })
+                        .each('end', function() {
+                            if (!--n) callback.apply(this, arguments);
+                        });
+                };
+
+                /* set specific layer opacity */
+                var set_node_layer_opacity = function(l, o) {
+                    node_layers.select('#node_layer_' + l).style("opacity", o);
+                };
+
+                var no_tween_animation = function() {
+                    console.log("no_tween_animation called");
+                    reset_layer_state();
+                    current_node_animation = setInterval(function() {
+                        set_node_layer_opacity(node_layer_previous, 0);
+                        set_node_layer_opacity(node_layer_current, 1);
+                        shift_layer_state();
+                    }, frame_duration_selection);
+                };
+
+                var ease_tween_animation = function(ease_type) {
+                    reset_layer_state();
+                    current_node_animation = setInterval(function() {
+                        node_layers.select('#node_layer_' + node_layer_previous).transition().ease(ease_type).duration(frame_duration_selection).style('opacity', 0);
+                        node_layers.select('#node_layer_' + node_layer_current).transition().ease(ease_type).duration(frame_duration_selection).style('opacity', 1);
+                        shift_layer_state();
+                    }, frame_duration_selection);
+                };
+
+                var linear_tween_animation = function() {
+                    console.log("linear_tween_animation called");
+                    ease_tween_animation("linear");
+                };
+
+                var quad_tween_animation = function() {
+                    console.log("quad_tween_animation called");
+                    ease_tween_animation("quad");
+                };
+
+                var cubic_tween_animation = function() {
+                    console.log("cubic_tween_animation called");
+                    ease_tween_animation("cubic");
+                };
+
+                var elastic_tween_animation = function() {
+                    console.log("elastic_tween_animation called");
+                    ease_tween_animation("elastic");
+                };
+
+                var bounce_tween_animation = function() {
+                    console.log("bounce_tween_animation called");
+                    ease_tween_animation("bounce");
+                };
+
+                var reset_layer_state = function() {
+                    node_layer_current = 1;
+                    node_layer_previous = node_layer_count;
+                }
+
+                var shift_layer_state = function() {
+                    node_layer_current = (node_layer_current + 1) % (node_layer_count + 1);
+                    node_layer_previous = (node_layer_previous + 1) % (node_layer_count + 1);
+                    if (node_layer_current == 0) node_layer_current++;
+                    if (node_layer_previous == 0) node_layer_previous++;
+                }
+            });
+        </script>
+    </body>
+    
 </html>
